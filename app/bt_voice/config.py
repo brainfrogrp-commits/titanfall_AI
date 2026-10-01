@@ -25,6 +25,7 @@ DEFAULTS = {
     "proactive_enabled": True,
     "proactive_cooldown_s": 45,
     "persona_extra": "",
+    "chapter_mode": "auto",
 }
 
 _lock = threading.Lock()

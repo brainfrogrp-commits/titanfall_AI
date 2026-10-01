@@ -33,7 +33,11 @@ cooldown on the settings page. Use **Send a test event** to try it.
 The Northstar script mod that sends real events from the game is the next
 phase and is not built yet.
 
+## BT's personality and spoiler gating
+See `docs/BT_PERSONA.md`. BT only knows what has happened up to your current mission, and the
+settings page lets you pick the mission manually until the game mod reports it.
+
 ## Status
-Built and checked: settings API, key handling, event intake. **Not yet tested
+Built and checked: settings API, key handling, event intake, mission gating (unit-tested). **Not yet tested
 end to end** (needs Windows, a mic, and live keys): global hotkey, mic capture,
 Whisper, Inworld voice list endpoint, playback.

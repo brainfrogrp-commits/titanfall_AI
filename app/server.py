@@ -6,7 +6,7 @@ import threading
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from bt_voice import config, inworld
+from bt_voice import config, inworld, lore
 from bt_voice.bt import engine, hotkey
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
@@ -74,6 +74,18 @@ def event():
     if not body.get("type") and not body.get("text"):
         return jsonify(ok=False, error="need type or text"), 400
     return jsonify(ok=True, commenting=engine.game_event(body))
+
+
+@app.get("/api/chapters")
+def chapters():
+    cid = engine.chapter_id()
+    return jsonify(
+        chapters=lore.chapters_summary(),
+        mode=config.load()["chapter_mode"],
+        detected=engine.detected_chapter,
+        active=cid,
+        active_name=lore.CHAPTER_BY_ID[cid]["name"] if cid in lore.CHAPTER_BY_ID else None,
+    )
 
 
 @app.get("/api/status")

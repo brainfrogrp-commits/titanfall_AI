@@ -7,21 +7,9 @@ import threading
 import time
 from typing import Optional
 
-from bt_voice import config, inworld, llm, speech_io
+from bt_voice import config, inworld, llm, lore, speech_io
 
 log = logging.getLogger("bt")
-
-PERSONA = (
-    "You are BT-7274, a Vanguard-class Titan, speaking out loud to your Pilot "
-    "in Titanfall 2. You are loyal, literal-minded and dry. You speak in short, "
-    "plain, precise sentences, address the player as 'Pilot', and occasionally "
-    "misread an idiom with perfect sincerity. You value the mission and your "
-    "Pilot's survival, and you say 'Trust me' only when it matters. "
-    "Reply in 1 to 3 short sentences, suitable for being spoken aloud: no "
-    "markdown, no lists, no stage directions. Only mention what you actually "
-    "know from the game context below; if you don't know, say so plainly. "
-    "Never invent mission details."
-)
 
 # Event types BT is allowed to react to unprompted. Anything else is just
 # recorded as context.
@@ -59,6 +47,13 @@ class Engine:
         self._busy = threading.Lock()
         self._last_comment = 0.0
         self.status = "idle"
+        self.detected_chapter = None  # chapter id last seen from the game's map name
+
+    def chapter_id(self, cfg: dict = None):
+        """Chapter BT's knowledge is gated to: the manual choice, else the
+        last mission detected from the game, else None (unknown)."""
+        mode = (cfg or config.load())["chapter_mode"]
+        return self.detected_chapter if mode == "auto" else mode
 
     # --- logging for the web page ---
     def note(self, kind: str, text: str) -> None:
@@ -66,14 +61,10 @@ class Engine:
         log.info("%s: %s", kind, text)
 
     # --- core pipeline ---
-    def _system(self, cfg: dict, extra: str = "") -> str:
-        parts = [PERSONA]
-        if cfg["persona_extra"]:
-            parts.append(cfg["persona_extra"])
-        parts.append("Game context:\n" + self.context.describe())
-        if extra:
-            parts.append(extra)
-        return "\n\n".join(parts)
+    def _system(self, cfg: dict, proactive: bool = False) -> str:
+        return lore.build_system_prompt(
+            self.chapter_id(cfg), self.context.describe(), cfg["persona_extra"], proactive
+        )
 
     def speak(self, cfg: dict, text: str, voice_id: str = "") -> None:
         self.status = "speaking"
@@ -140,6 +131,13 @@ class Engine:
         """Records an event; returns True if BT will comment on it."""
         self.context.add(event)
         cfg = config.load()
+        entered = lore.chapter_for_map((event.get("data") or {}).get("map", ""))
+        if entered and entered != self.detected_chapter:
+            self.detected_chapter = entered
+            name = lore.CHAPTER_BY_ID[entered]["name"]
+            self.note("info", f"Mission detected: {name}")
+            event.setdefault("text", f"The Pilot has arrived at the mission: {name}.")
+            event["comment"] = True
         notable = event.get("type") in NOTABLE_EVENTS or event.get("comment")
         now = time.time()
         if not (cfg["proactive_enabled"] and notable and not self._busy.locked()
@@ -153,12 +151,15 @@ class Engine:
         cfg = config.load()
         prompt = (
             "Something just happened: " + (event.get("text") or event.get("type", "an event"))
-            + ". Make one brief spoken remark to your Pilot about it, in character."
+            + ". Decide whether BT would speak. If so, make one brief spoken remark to your Pilot, in character."
         )
         reply = llm.chat(cfg, [
-            {"role": "system", "content": self._system(cfg)},
+            {"role": "system", "content": self._system(cfg, proactive=True)},
             {"role": "user", "content": prompt},
         ], max_tokens=120)
+        if reply.strip().upper().startswith("SKIP"):
+            self.note("info", f"BT stayed quiet about: {event.get('text') or event.get('type')}")
+            return
         self.note("bt", reply)
         self.speak(cfg, reply)
 

@@ -84,6 +84,11 @@
   <section>
     <h2>Game awareness</h2>
     <div class="switch"><input type="checkbox" id="proactive_enabled"><span>BT may comment on what's happening without being asked</span></div>
+    <label>Mission (controls what BT knows, so he never spoils what's ahead)</label>
+    <div class="row">
+      <select id="chapter_mode"></select>
+      <div id="chapterMsg" class="sub" style="margin:0;align-self:center"></div>
+    </div>
     <label>Minimum seconds between unprompted comments</label>
     <input type="number" id="proactive_cooldown_s" min="5" max="600">
     <label>What BT currently knows</label>
@@ -100,7 +105,7 @@
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const FIELDS = ['inworld_voice_id','inworld_model_id','speaking_rate','volume','openrouter_model','whisper_model_size','persona_extra','proactive_cooldown_s'];
+const FIELDS = ['chapter_mode','inworld_voice_id','inworld_model_id','speaking_rate','volume','openrouter_model','whisper_model_size','persona_extra','proactive_cooldown_s'];
 const SECRETS = ['inworld_api_key','openrouter_api_key'];
 let hotkey = '';
 
@@ -120,12 +125,24 @@ async function loadConfig() {
   $('hasOpenrouter').className = 'pill ' + (c.has_openrouter_api_key ? 'ok' : 'err');
 }
 
+async function loadChapters() {
+  const r = await api('/api/chapters');
+  const sel = $('chapter_mode'), keep = sel.value;
+  if (!sel.options.length) {
+    sel.innerHTML = '<option value="auto">Auto-detect from the game</option>' +
+      r.chapters.map(c => `<option value="${c.id}">${c.number}. ${c.name}</option>`).join('');
+    sel.value = keep || r.mode;
+  }
+  $('chapterMsg').textContent = r.active_name ? `BT currently knows up to: ${r.active_name}` : 'No mission detected yet. BT knows only the broad situation.';
+}
+
 async function save() {
   const body = {hotkey, proactive_enabled: $('proactive_enabled').checked};
   FIELDS.forEach(f => body[f] = $(f).value);
   SECRETS.forEach(f => { body[f] = $(f).value.trim(); });
   await api('/api/config', body);
   SECRETS.forEach(f => $(f).value = '');
+  loadChapters();
   $('saveMsg').textContent = 'Saved';
   setTimeout(() => $('saveMsg').textContent = '', 2000);
   loadConfig();
@@ -175,7 +192,7 @@ async function poll() {
     if (atBottom) log.scrollTop = log.scrollHeight;
   } catch (e) { $('status').textContent = 'offline'; }
 }
-loadConfig(); poll(); setInterval(poll, 1000);
+loadChapters().then(loadConfig); poll(); setInterval(poll, 1000); setInterval(loadChapters, 3000);
 </script>
 </body>
 </html>
