@@ -8,6 +8,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 from bt_voice import config, inworld, lore
 from bt_voice.bt import engine, hotkey
+from bt_voice import lifecycle
 from bt_voice.vad import VoiceListener
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
@@ -120,6 +121,16 @@ def status():
     )
 
 
+def shutdown() -> None:
+    """Release the global hotkey and the mic when the app is closing."""
+    hotkey.unbind()
+    if listener.running:
+        try:
+            listener.stop()
+        except Exception:
+            pass
+
+
 def already_running(port: int) -> bool:
     """Windows lets a second copy bind a port an older copy already holds, so
     the old one silently keeps serving. Detect that and refuse to start."""
@@ -138,5 +149,6 @@ if __name__ == "__main__":
         raise SystemExit(1)
     hotkey.bind(config.load()["hotkey"])
     listener.apply(config.load())
+    lifecycle.install(shutdown)
     print("BT-7274 voice companion: open http://127.0.0.1:5757")
     app.run(host="127.0.0.1", port=5757, threaded=True)
