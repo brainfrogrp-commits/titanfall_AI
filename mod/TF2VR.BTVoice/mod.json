@@ -1,0 +1,13 @@
+{
+  "Name": "TF2VR.BTVoice",
+  "Description": "Sends what is happening in the game to the BT-7274 voice companion app.",
+  "Version": "0.1.0",
+  "LoadPriority": 1,
+  "Scripts": [
+    {
+      "Path": "bt_voice_sensors.nut",
+      "RunOn": "SERVER && SP",
+      "ServerCallback": { "After": "BTVoice_Init" }
+    }
+  ]
+}

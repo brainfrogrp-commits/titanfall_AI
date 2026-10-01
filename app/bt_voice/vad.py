@@ -178,7 +178,9 @@ class VoiceListener:
         from bt_voice import speech_io
 
         cfg = self._cfg
+        started = time.monotonic()
         text = speech_io.transcribe(audio, cfg["whisper_model_size"])
+        stt_s = time.monotonic() - started
         if not text:
             return
         addressed, question = extract_question(
@@ -187,4 +189,4 @@ class VoiceListener:
         if not addressed:
             self.engine.note("info", f'Heard "{text}" (not addressed to BT, ignored)')
             return
-        self.engine.hear(question)
+        self.engine.hear(question, stt_s)

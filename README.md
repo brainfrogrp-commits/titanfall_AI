@@ -33,6 +33,10 @@ cooldown on the settings page. Use **Send a test event** to try it.
 The Northstar script mod that sends real events from the game is the next
 phase and is not built yet.
 
+## Game awareness
+The `mod/TF2VR.BTVoice` Northstar mod tells the app where you are, whether you are in the Titan,
+health, weapon, nearby enemies and more. See `docs/GAME_AWARENESS.md` (includes install steps).
+
 ## BT's personality and spoiler gating
 See `docs/BT_PERSONA.md`. BT only knows what has happened up to your current mission, and the
 settings page lets you pick the mission manually until the game mod reports it.

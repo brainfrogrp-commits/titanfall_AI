@@ -88,7 +88,7 @@
     <div class="row">
       <div><label>Model slug</label><input type="text" id="openrouter_model"></div>
       <div><label>Speech recognition (runs on this PC)</label>
-        <select id="whisper_model_size"><option>tiny</option><option>base</option><option>small</option><option>medium</option></select></div>
+        <select id="whisper_model_size"><option>tiny.en</option><option>base.en</option><option>small.en</option><option>tiny</option><option>base</option><option>small</option><option>medium</option></select></div>
     </div>
     <label>Extra personality notes (optional)</label>
     <textarea id="persona_extra" placeholder="e.g. Keep answers under two sentences."></textarea>
@@ -104,6 +104,7 @@
     </div>
     <label>Minimum seconds between unprompted comments</label>
     <input type="number" id="proactive_cooldown_s" min="5" max="600">
+    <label>Game connection <span id="gameMsg" class="sub"></span></label>
     <label>What BT currently knows</label>
     <pre id="context"></pre>
     <div style="margin-top:10px"><button class="ghost" id="fakeEvent">Send a test event</button></div>
@@ -203,6 +204,9 @@ async function poll() {
     const s = await api('/api/status');
     $('status').textContent = s.status;
     $('context').textContent = s.context;
+    $('gameMsg').textContent = s.game_seconds === null ? '(nothing received from the game yet)'
+      : s.game_seconds < 10 ? '(connected)' : `(last message ${s.game_seconds}s ago)`;
+    $('gameMsg').className = 'sub ' + (s.game_seconds !== null && s.game_seconds < 10 ? 'ok' : '');
     const thr = parseFloat($('vad_threshold').value) || 0.02, max = 0.2;
     $('meter').style.width = Math.min(100, s.mic_level / max * 100) + '%';
     $('meterMark').style.left = Math.min(100, thr / max * 100) + '%';

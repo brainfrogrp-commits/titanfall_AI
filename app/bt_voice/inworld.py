@@ -18,6 +18,9 @@ class InworldError(RuntimeError):
     pass
 
 
+_session = requests.Session()  # reused connection: skips a TLS handshake per sentence
+
+
 def _headers(cfg: dict) -> dict:
     if not cfg["inworld_api_key"]:
         raise InworldError("No Inworld API key set. Add it on the settings page.")
@@ -45,7 +48,7 @@ def synthesize_chunk(cfg: dict, text: str, voice_id: str = "") -> bytes:
     voice = voice_id or cfg["inworld_voice_id"]
     if not voice:
         raise InworldError("No voice selected. Pick one on the settings page.")
-    resp = requests.post(
+    resp = _session.post(
         cfg["inworld_base_url"].rstrip("/") + SYNTHESIZE_PATH,
         headers=_headers(cfg),
         json={

@@ -45,16 +45,31 @@ _whisper = {}
 _whisper_lock = threading.Lock()
 
 
+# words the model should expect, so "BT" and the game's names are heard correctly
+VOCAB_HINT = "BT, BT-7274, Pilot, Cooper, Titan, Typhon, IMC, Militia, Apex Predators."
+
+
+def _model(model_size: str):
+    if model_size not in _whisper:
+        from faster_whisper import WhisperModel
+
+        _whisper[model_size] = WhisperModel(model_size, device="cpu", compute_type="int8")
+    return _whisper[model_size]
+
+
+def preload(model_size: str) -> None:
+    """Load (and download, the first time) the speech model ahead of the first question."""
+    with _whisper_lock:
+        _model(model_size)
+
+
 def transcribe(audio, model_size: str) -> str:
     if audio.size == 0:
         return ""
     with _whisper_lock:
-        if model_size not in _whisper:
-            from faster_whisper import WhisperModel
-
-            _whisper[model_size] = WhisperModel(model_size, device="cpu", compute_type="int8")
-        model = _whisper[model_size]
-        segments, _ = model.transcribe(audio, language="en")
+        segments, _ = _model(model_size).transcribe(
+            audio, language="en", beam_size=1, condition_on_previous_text=False, initial_prompt=VOCAB_HINT
+        )
         return " ".join(s.text.strip() for s in segments).strip()
 
 

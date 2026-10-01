@@ -113,12 +113,36 @@ def status():
         status=engine.status,
         hotkey=hotkey.key,
         hotkey_error=hotkey.error,
+        game_seconds=engine.game_connected_seconds(),
         listening=listener.running,
         listen_error=listener.error,
         mic_level=round(listener.level, 4),
         context=engine.context.describe(),
         log=list(engine.log),
     )
+
+
+def warm_up() -> None:
+    """Do the slow one-time work now instead of on your first question."""
+    import time as _time
+
+    cfg = config.load()
+    started = _time.monotonic()
+    try:
+        from bt_voice import speech_io
+
+        engine.note("info", f"Loading the speech model ({cfg['whisper_model_size']})...")
+        speech_io.preload(cfg["whisper_model_size"])
+        engine.note("info", f"Speech model ready ({_time.monotonic() - started:.1f}s).")
+    except Exception as e:
+        engine.note("error", f"Couldn't load the speech model: {e}")
+    for url in ("https://openrouter.ai", cfg["inworld_base_url"]):
+        try:  # opens the secure connection now so the first real request skips the handshake
+            from bt_voice import llm
+
+            llm._session.head(url, timeout=5)
+        except Exception:
+            pass
 
 
 def shutdown() -> None:
@@ -150,5 +174,6 @@ if __name__ == "__main__":
     hotkey.bind(config.load()["hotkey"])
     listener.apply(config.load())
     lifecycle.install(shutdown)
+    threading.Thread(target=warm_up, daemon=True).start()
     print("BT-7274 voice companion: open http://127.0.0.1:5757")
     app.run(host="127.0.0.1", port=5757, threaded=True)
