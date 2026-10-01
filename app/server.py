@@ -8,9 +8,11 @@ from flask import Flask, jsonify, request, send_from_directory
 
 from bt_voice import config, inworld, lore
 from bt_voice.bt import engine, hotkey
+from bt_voice.vad import VoiceListener
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 app = Flask(__name__, static_folder="web", static_url_path="")
+listener = VoiceListener(engine)
 
 
 @app.get("/")
@@ -29,6 +31,7 @@ def set_config():
     cfg = config.update(request.get_json(force=True) or {})
     if cfg["hotkey"] != before["hotkey"] or hotkey.key is None:
         hotkey.bind(cfg["hotkey"])
+    listener.apply(cfg)
     return jsonify(config.public_view(cfg))
 
 
@@ -94,6 +97,9 @@ def status():
         status=engine.status,
         hotkey=hotkey.key,
         hotkey_error=hotkey.error,
+        listening=listener.running,
+        listen_error=listener.error,
+        mic_level=round(listener.level, 4),
         context=engine.context.describe(),
         log=list(engine.log),
     )
@@ -101,5 +107,6 @@ def status():
 
 if __name__ == "__main__":
     hotkey.bind(config.load()["hotkey"])
+    listener.apply(config.load())
     print("BT-7274 voice companion: open http://127.0.0.1:5757")
     app.run(host="127.0.0.1", port=5757, threaded=True)

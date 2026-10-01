@@ -41,6 +41,19 @@
       <div class="fit"><button class="ghost" id="capture">Set key</button></div>
     </div>
     <div id="hotkeyMsg" class="sub" style="margin:8px 0 0"></div>
+    <label>Hands-free (no button needed)</label>
+    <div class="switch" style="margin-top:0"><input type="checkbox" id="handsfree_enabled"><span>Listen for me. Say "BT, ..." and he answers.</span></div>
+    <div class="row">
+      <div><label>Wake words (comma separated)</label><input type="text" id="wake_words"></div>
+      <div><label>Sensitivity: speech counts above this level (lower = more sensitive)</label><input type="number" id="vad_threshold" step="0.005" min="0.002" max="0.3"></div>
+      <div><label>Pause that ends a sentence (seconds)</label><input type="number" id="vad_silence_s" step="0.1" min="0.3" max="3"></div>
+    </div>
+    <div class="switch"><input type="checkbox" id="wake_word_required"><span>Only answer when I say a wake word first (strongly recommended)</span></div>
+    <label>Mic level <span id="listenMsg" class="sub"></span></label>
+    <div style="position:relative;height:12px;background:#0e1116;border:1px solid var(--line);border-radius:6px;overflow:hidden">
+      <div id="meter" style="height:100%;width:0;background:var(--accent)"></div>
+      <div id="meterMark" style="position:absolute;top:0;bottom:0;width:2px;background:var(--bad)"></div>
+    </div>
     <label>Try without a mic</label>
     <div class="row">
       <input type="text" id="askText" placeholder="Ask BT something…">
@@ -105,7 +118,7 @@
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const FIELDS = ['chapter_mode','inworld_voice_id','inworld_model_id','speaking_rate','volume','openrouter_model','whisper_model_size','persona_extra','proactive_cooldown_s'];
+const FIELDS = ['wake_words','vad_threshold','vad_silence_s','chapter_mode','inworld_voice_id','inworld_model_id','speaking_rate','volume','openrouter_model','whisper_model_size','persona_extra','proactive_cooldown_s'];
 const SECRETS = ['inworld_api_key','openrouter_api_key'];
 let hotkey = '';
 
@@ -118,6 +131,8 @@ async function loadConfig() {
   const c = await api('/api/config');
   FIELDS.forEach(f => $(f).value = c[f]);
   $('proactive_enabled').checked = c.proactive_enabled;
+  $('handsfree_enabled').checked = c.handsfree_enabled;
+  $('wake_word_required').checked = c.wake_word_required;
   hotkey = c.hotkey; $('hotkey').value = c.hotkey;
   $('hasInworld').textContent = c.has_inworld_api_key ? 'saved' : 'not set';
   $('hasInworld').className = 'pill ' + (c.has_inworld_api_key ? 'ok' : 'err');
@@ -137,7 +152,8 @@ async function loadChapters() {
 }
 
 async function save() {
-  const body = {hotkey, proactive_enabled: $('proactive_enabled').checked};
+  const body = {hotkey, proactive_enabled: $('proactive_enabled').checked,
+    handsfree_enabled: $('handsfree_enabled').checked, wake_word_required: $('wake_word_required').checked};
   FIELDS.forEach(f => body[f] = $(f).value);
   SECRETS.forEach(f => { body[f] = $(f).value.trim(); });
   await api('/api/config', body);
@@ -163,6 +179,7 @@ async function loadVoices() {
 $('voiceSelect').onchange = e => { if (e.target.value) $('inworld_voice_id').value = e.target.value; };
 $('loadVoices').onclick = loadVoices;
 $('save').onclick = save;
+$('handsfree_enabled').onchange = save;
 $('preview').onclick = async () => { await save(); api('/api/preview', {voice_id: $('inworld_voice_id').value}); };
 $('askBtn').onclick = async () => { const t = $('askText').value.trim(); if (t) { $('askText').value=''; await save(); api('/api/ask', {text: t}); } };
 $('askText').onkeydown = e => { if (e.key === 'Enter') $('askBtn').click(); };
@@ -185,6 +202,11 @@ async function poll() {
     const s = await api('/api/status');
     $('status').textContent = s.status;
     $('context').textContent = s.context;
+    const thr = parseFloat($('vad_threshold').value) || 0.02, max = 0.2;
+    $('meter').style.width = Math.min(100, s.mic_level / max * 100) + '%';
+    $('meterMark').style.left = Math.min(100, thr / max * 100) + '%';
+    $('listenMsg').textContent = s.listen_error || (s.listening ? '(listening; red line = sensitivity)' : '(hands-free is off)');
+    $('listenMsg').className = 'sub ' + (s.listen_error ? 'err' : '');
     $('hotkeyMsg').textContent = s.hotkey_error || (s.hotkey ? `Listening for '${s.hotkey}' (hold to talk)` : '');
     $('hotkeyMsg').className = 'sub ' + (s.hotkey_error ? 'err' : '');
     const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
@@ -192,7 +214,7 @@ async function poll() {
     if (atBottom) log.scrollTop = log.scrollHeight;
   } catch (e) { $('status').textContent = 'offline'; }
 }
-loadChapters().then(loadConfig); poll(); setInterval(poll, 1000); setInterval(loadChapters, 3000);
+loadChapters().then(loadConfig); poll(); setInterval(poll, 400); setInterval(loadChapters, 3000);
 </script>
 </body>
 </html>

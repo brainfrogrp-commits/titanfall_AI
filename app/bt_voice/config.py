@@ -26,6 +26,11 @@ DEFAULTS = {
     "proactive_cooldown_s": 45,
     "persona_extra": "",
     "chapter_mode": "auto",
+    "handsfree_enabled": False,
+    "wake_words": "bt, b t, bee tee, beetee, beatty, beaty",
+    "wake_word_required": True,
+    "vad_threshold": 0.02,
+    "vad_silence_s": 0.8,
 }
 
 _lock = threading.Lock()

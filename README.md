@@ -13,8 +13,8 @@ CircuitLord's Titanfall 2 VR mod.
 3. The settings page opens at http://127.0.0.1:5757. Enter your **Inworld** and
    **OpenRouter** keys, pick a voice, press **Set key** to choose the talk key,
    then **Save settings**.
-4. Start the game in VR as usual. Map a controller button to the same key with
-   OpenVR2Key. Hold it, speak, release.
+4. Start the game in VR as usual. Either turn on **Hands-free** (say "BT, ...") or hold your talk key.
+   OpenVR2Key only works with SteamVR; see `docs/CONTROLLER_INPUT.md` for OpenXR.
 
 Settings and keys are stored in `%USERPROFILE%\.titanfall_bt\config.json`, outside
 this repo. The server only listens on localhost.

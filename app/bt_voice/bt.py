@@ -48,6 +48,7 @@ class Engine:
         self._last_comment = 0.0
         self.status = "idle"
         self.detected_chapter = None  # chapter id last seen from the game's map name
+        self.last_done = 0.0  # monotonic time the last request finished
 
     def chapter_id(self, cfg: dict = None):
         """Chapter BT's knowledge is gated to: the manual choice, else the
@@ -93,7 +94,15 @@ class Engine:
             self.note("error", str(e))
         finally:
             self.status = "idle"
+            self.last_done = time.monotonic()
             self._busy.release()
+
+    def is_busy(self) -> bool:
+        return self._busy.locked()
+
+    def hear(self, question: str) -> None:
+        """A question picked up by hands-free listening (already transcribed)."""
+        self.ask_text(question)
 
     # --- push to talk ---
     def ptt_press(self) -> None:
