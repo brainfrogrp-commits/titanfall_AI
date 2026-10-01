@@ -79,6 +79,21 @@ def event():
     return jsonify(ok=True, commenting=engine.game_event(body))
 
 
+@app.get("/api/version")
+def version():
+    """Which build and folder is actually running, for debugging stale installs."""
+    import os
+    import subprocess
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        build = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=here, capture_output=True,
+                               text=True, timeout=3).stdout.strip() or "unknown"
+    except Exception:
+        build = "unknown (no git)"
+    return jsonify(build=build, folder=here)
+
+
 @app.get("/api/chapters")
 def chapters():
     cid = engine.chapter_id()

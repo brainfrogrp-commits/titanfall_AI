@@ -115,6 +115,7 @@
   </section>
 
   <button id="save">Save settings</button> <span id="saveMsg" class="sub"></span>
+  <div id="version" class="sub" style="margin-top:18px;font-size:12px"></div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
@@ -214,6 +215,7 @@ async function poll() {
     if (atBottom) log.scrollTop = log.scrollHeight;
   } catch (e) { $('status').textContent = 'offline'; }
 }
+api('/api/version').then(v => $('version').textContent = `Build ${v.build}  |  running from ${v.folder}`);
 loadChapters().then(loadConfig); poll(); setInterval(poll, 400); setInterval(loadChapters, 3000);
 </script>
 </body>
