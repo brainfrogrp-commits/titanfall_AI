@@ -105,7 +105,22 @@ def status():
     )
 
 
+def already_running(port: int) -> bool:
+    """Windows lets a second copy bind a port an older copy already holds, so
+    the old one silently keeps serving. Detect that and refuse to start."""
+    import socket
+
+    with socket.socket() as probe:
+        probe.settimeout(0.5)
+        return probe.connect_ex(("127.0.0.1", port)) == 0
+
+
 if __name__ == "__main__":
+    if already_running(5757):
+        print("\nBT-7274 voice app is ALREADY RUNNING (another window, maybe from an older folder).")
+        print("Close every black console window running it, then start this again.")
+        print("To find it:  netstat -ano | findstr 5757   then   taskkill /PID <number> /F\n")
+        raise SystemExit(1)
     hotkey.bind(config.load()["hotkey"])
     listener.apply(config.load())
     print("BT-7274 voice companion: open http://127.0.0.1:5757")
