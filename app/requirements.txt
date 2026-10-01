@@ -1,0 +1,7 @@
+flask>=3.0
+requests>=2.31.0
+numpy>=1.26.0
+sounddevice>=0.4.6
+miniaudio>=1.59
+keyboard>=0.13.5
+faster-whisper>=1.0.0
