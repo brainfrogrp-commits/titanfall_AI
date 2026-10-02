@@ -32,6 +32,14 @@ outdoors, and an overhang reads as "under cover". Change `BTVOICE_COVER_RANGE` i
 4. Start the app, then the game. In the app's **Game awareness** section, "Game connection" should say
    "(connected)" a few seconds after the level loads, and "What BT currently knows" should fill in.
 
+## Reading the banner
+The banner at the top of the settings page tells you what is going on:
+- **Green, "Connected to the game"** and "BT thinks you are on: <mission>": all good.
+- **Red, "Titanfall 2 is running, but this app has received nothing"**: the mod is not installed or not loading,
+  or the game was launched without `-allowlocalhttp`.
+- **"BT doesn't know which mission this is"**: BT will say so if asked, instead of guessing. Pick the mission
+  under Game awareness, or fix the connection.
+
 ## If it does not work
 - **"nothing received from the game yet"**: the launch flag is missing or not applied, or the mod did not
   load. Look in the game's console/log for `[BTVoice] started`. Without that line the mod did not load.

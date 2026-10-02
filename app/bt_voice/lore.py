@@ -267,10 +267,18 @@ def build_system_prompt(chapter_id: Optional[str], game_context: str, extra: str
         )
     else:
         parts.append(
-            "CURRENT MISSION: unknown. You know only the broad situation: the Frontier Militia is at war with the "
-            "IMC on Typhon, and you are linked to Pilot Cooper. Say you lack data for anything more specific."
+            "CURRENT MISSION: unknown. You cannot tell which mission this is. If the Pilot asks where you are, "
+            "what is happening, or what to do next, say plainly that you cannot tell which mission this is and "
+            "that you lack data. Never say that things look fine. You know only the broad situation: the Frontier "
+            "Militia is at war with the IMC on Typhon, and you are linked to Pilot Cooper."
         )
     parts.append("GAME DATA (live, from sensors; may be incomplete):\n" + (game_context or "(none)"))
+    if (game_context or "").startswith("(no game data"):
+        parts.append(
+            "SENSOR LINK OFFLINE: you have no readings about the Pilot's surroundings, health, weapons or enemies. "
+            "If asked about the situation, say your sensor link is offline. Never say that things look good or that "
+            "everything is fine."
+        )
     if extra:
         parts.append("ADDITIONAL INSTRUCTIONS FROM THE PILOT:\n" + extra)
     if proactive:

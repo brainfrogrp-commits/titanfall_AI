@@ -2,18 +2,33 @@
 except to Inworld/OpenRouter."""
 
 import logging
+import os
 import threading
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from bt_voice import config, inworld, lore
+from bt_voice import config, gameproc, inworld, lifecycle, lore
 from bt_voice.bt import engine, hotkey
-from bt_voice import lifecycle
 from bt_voice.vad import VoiceListener
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+PORT = 5757
+_ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
+_ALLOWED_ORIGINS = {f"http://{host}" for host in _ALLOWED_HOSTS}
+
 app = Flask(__name__, static_folder="web", static_url_path="")
 listener = VoiceListener(engine)
+
+
+@app.before_request
+def only_our_own_page():
+    """Any website open in your browser can fire requests at localhost. Refuse
+    anything that isn't this app's own page or the game (which sends no Origin)."""
+    if request.host not in _ALLOWED_HOSTS:  # also blocks DNS-rebinding tricks
+        return jsonify(error="forbidden host"), 403
+    origin = request.headers.get("Origin")
+    if origin and origin not in _ALLOWED_ORIGINS:
+        return jsonify(error="forbidden origin"), 403
 
 
 @app.get("/")
@@ -83,7 +98,6 @@ def event():
 @app.get("/api/version")
 def version():
     """Which build and folder is actually running, for debugging stale installs."""
-    import os
     import subprocess
 
     here = os.path.dirname(os.path.abspath(__file__))
@@ -114,6 +128,9 @@ def status():
         hotkey=hotkey.key,
         hotkey_error=hotkey.error,
         game_seconds=engine.game_connected_seconds(),
+        game_running=gameproc.game_running(),
+        mission=engine.mission_info(),
+        session_active=engine.convo.active,
         listening=listener.running,
         listen_error=listener.error,
         mic_level=round(listener.level, 4),
@@ -136,6 +153,10 @@ def warm_up() -> None:
         engine.note("info", f"Speech model ready ({_time.monotonic() - started:.1f}s).")
     except Exception as e:
         engine.note("error", f"Couldn't load the speech model: {e}")
+    try:  # the fixed "listening" / "standing by" lines, ready to play instantly
+        engine.prepare_phrases()
+    except Exception as e:
+        engine.note("error", f"Couldn't prepare BT's short phrases: {e}")
     for url in ("https://openrouter.ai", cfg["inworld_base_url"]):
         try:  # opens the secure connection now so the first real request skips the handshake
             from bt_voice import llm
@@ -155,6 +176,12 @@ def shutdown() -> None:
             pass
 
 
+def quit_app() -> None:
+    """Called after BT says goodbye: release the hotkey and mic, then exit."""
+    shutdown()
+    os._exit(0)
+
+
 def already_running(port: int) -> bool:
     """Windows lets a second copy bind a port an older copy already holds, so
     the old one silently keeps serving. Detect that and refuse to start."""
@@ -166,14 +193,15 @@ def already_running(port: int) -> bool:
 
 
 if __name__ == "__main__":
-    if already_running(5757):
+    if already_running(PORT):
         print("\nBT-7274 voice app is ALREADY RUNNING (another window, maybe from an older folder).")
         print("Close every black console window running it, then start this again.")
-        print("To find it:  netstat -ano | findstr 5757   then   taskkill /PID <number> /F\n")
+        print(f"To find it:  netstat -ano | findstr {PORT}   then   taskkill /PID <number> /F\n")
         raise SystemExit(1)
     hotkey.bind(config.load()["hotkey"])
     listener.apply(config.load())
+    engine.on_quit = quit_app
     lifecycle.install(shutdown)
     threading.Thread(target=warm_up, daemon=True).start()
-    print("BT-7274 voice companion: open http://127.0.0.1:5757")
-    app.run(host="127.0.0.1", port=5757, threaded=True)
+    print(f"BT-7274 voice companion: open http://127.0.0.1:{PORT}")
+    app.run(host="127.0.0.1", port=PORT, threaded=True)

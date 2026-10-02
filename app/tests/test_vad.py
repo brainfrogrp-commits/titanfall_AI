@@ -8,9 +8,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from bt_voice.vad import BLOCK, Segmenter, extract_question, parse_wake_words  # noqa: E402
-
-WAKE = parse_wake_words("bt, b t, bee tee, beetee")
+from bt_voice.vad import BLOCK, Segmenter  # noqa: E402
 
 
 def run(blocks):
@@ -41,31 +39,6 @@ class Segmentation(unittest.TestCase):
 
     def test_short_pause_does_not_split(self):
         self.assertEqual(len(run([(0.1, 1.0), (0.0, 0.4), (0.1, 1.0), (0.0, 1.5)])), 1)
-
-
-class WakeWord(unittest.TestCase):
-    def test_wake_word_is_stripped(self):
-        self.assertEqual(extract_question("BT, what's our objective?", WAKE, True), (True, "what's our objective?"))
-
-    def test_dotted_form_works(self):
-        self.assertEqual(extract_question("B.T. how are you", WAKE, True), (True, "how are you"))
-
-    def test_not_addressed_is_ignored(self):
-        self.assertEqual(extract_question("hey chat look at this", WAKE, True)[0], False)
-
-    def test_wake_word_must_be_at_start(self):
-        self.assertEqual(extract_question("tell me BT what is that", WAKE, True)[0], False)
-
-    def test_word_that_merely_starts_with_bt_is_not_a_wake_word(self):
-        self.assertEqual(extract_question("btw that was close", WAKE, True)[0], False)
-
-    def test_name_alone_gets_attention_prompt(self):
-        addressed, q = extract_question("BT", WAKE, True)
-        self.assertTrue(addressed)
-        self.assertIn("attention", q)
-
-    def test_no_wake_word_mode_answers_everything(self):
-        self.assertEqual(extract_question("what is that", WAKE, False), (True, "what is that"))
 
 
 if __name__ == "__main__":

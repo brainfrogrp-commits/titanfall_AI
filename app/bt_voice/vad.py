@@ -1,12 +1,10 @@
-"""Hands-free listening: detect speech on the mic, cut it into utterances,
-and only act on ones addressed to BT ("BT, ..."). Needs no button, so it works
-on any OpenXR runtime."""
+"""Hands-free listening: detect speech on the mic, cut it into sentences,
+transcribe them, and hand each one to the conversation logic (session.py)."""
 
 import collections
-import re
 import threading
 import time
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 
@@ -55,39 +53,6 @@ class Segmenter:
         return None
 
 
-def _normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", text.lower())).strip()
-
-
-def parse_wake_words(setting: str) -> List[str]:
-    words = [_normalize(w) for w in (setting or "").split(",")]
-    return sorted({w for w in words if w}, key=len, reverse=True)  # longest first
-
-
-def _after_prefix(original: str, normalized_prefix: str) -> str:
-    """The original text after the words that normalize to the wake word,
-    so punctuation like apostrophes in the question survives."""
-    for i in range(1, len(original) + 1):
-        if _normalize(original[:i]) == normalized_prefix:
-            return original[i:].lstrip(" ,.:;!?-").strip()
-    return ""
-
-
-def extract_question(transcript: str, wake_words: List[str], wake_required: bool) -> Tuple[bool, str]:
-    """Returns (addressed_to_bt, what_to_answer). With a wake word required,
-    only transcripts that START with it count, and the wake word is removed."""
-    cleaned = _normalize(transcript)
-    if not cleaned:
-        return False, ""
-    if not wake_required:
-        return True, transcript.strip()
-    for word in wake_words:
-        if cleaned == word or cleaned.startswith(word + " "):
-            rest = _after_prefix(transcript, word)
-            return True, rest or "The Pilot is getting your attention."
-    return False, ""
-
-
 class VoiceListener:
     def __init__(self, engine):
         self.engine = engine
@@ -119,9 +84,13 @@ class VoiceListener:
             )
             self._stream.start()
             self.running, self.error = True, ""
+            self.engine.convo.reset()
             self._worker = threading.Thread(target=self._work, daemon=True)
             self._worker.start()
-            self.engine.note("info", "Hands-free listening on. Say 'BT, ...' to talk.")
+            if self._cfg["wake_word_required"]:
+                self.engine.note("info", 'Hands-free is on. Say "hey BT" to start talking.')
+            else:
+                self.engine.note("info", "Hands-free is on. BT answers everything he hears.")
         except Exception as e:
             self.running, self.error = False, f"Hands-free mic error: {e}"
             self.engine.note("error", self.error)
@@ -137,7 +106,8 @@ class VoiceListener:
                 pass
             self._stream = None
         self.level = 0.0
-        self.engine.note("info", "Hands-free listening off.")
+        self.engine.convo.reset()
+        self.engine.note("info", "Hands-free is off.")
 
     def _refresh_cfg(self, force: bool = False) -> None:
         from bt_voice import config
@@ -167,6 +137,7 @@ class VoiceListener:
         while self.running:
             self._wake.wait(timeout=1.0)
             self._wake.clear()
+            self._check_timeout()
             while self._pending and self.running:
                 audio = self._pending.popleft()
                 try:
@@ -174,8 +145,15 @@ class VoiceListener:
                 except Exception as e:
                     self.engine.note("error", f"Listening error: {e}")
 
+    def _check_timeout(self) -> None:
+        convo = self.engine.convo
+        if self.engine.last_done:
+            convo.touch(self.engine.last_done)  # BT talking counts as activity, so long answers don't time out
+        if not self.engine.is_busy() and convo.timed_out(time.monotonic(), self._cfg):
+            self.engine.voice_action("timeout", "")
+
     def _handle(self, audio: np.ndarray) -> None:
-        from bt_voice import speech_io
+        from bt_voice import session, speech_io
 
         cfg = self._cfg
         started = time.monotonic()
@@ -183,10 +161,9 @@ class VoiceListener:
         stt_s = time.monotonic() - started
         if not text:
             return
-        addressed, question = extract_question(
-            text, parse_wake_words(cfg["wake_words"]), cfg["wake_word_required"]
-        )
-        if not addressed:
-            self.engine.note("info", f'Heard "{text}" (not addressed to BT, ignored)')
+        action, payload = self.engine.convo.handle(text, cfg, time.monotonic())
+        if action == "ignore":
+            if not session.is_noise(text):
+                self.engine.note("info", f'Heard "{text}" (ignored. Say "hey BT" first to start a conversation.)')
             return
-        self.engine.hear(question, stt_s)
+        self.engine.voice_action(action, payload, stt_s)

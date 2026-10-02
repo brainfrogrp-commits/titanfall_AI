@@ -70,7 +70,10 @@ def transcribe(audio, model_size: str) -> str:
         segments, _ = _model(model_size).transcribe(
             audio, language="en", beam_size=1, condition_on_previous_text=False, initial_prompt=VOCAB_HINT
         )
-        return " ".join(s.text.strip() for s in segments).strip()
+        # drop segments the model itself thinks are not speech: this is where "thanks for watching"
+        # style inventions from room noise come from
+        kept = [s.text.strip() for s in segments if not (s.no_speech_prob > 0.6 and s.avg_logprob < -1.0)]
+        return " ".join(kept).strip()
 
 
 def play_mp3(mp3_data: bytes, volume: float = 1.0) -> None:

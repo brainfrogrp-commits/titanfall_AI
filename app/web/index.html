@@ -25,13 +25,18 @@
   #log { height: 220px; overflow-y:auto; background:#0e1116; border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:14px; }
   #log div { margin: 3px 0; } .k-you{color:#9ad1ff} .k-bt{color:#ffd479} .k-error{color:var(--bad)} .k-info{color:var(--dim)}
   pre { white-space: pre-wrap; margin: 0; font-size: 13px; color: var(--dim); }
+  .banner { padding:12px 14px; border-radius:10px; border:1px solid var(--line); background:var(--panel); margin-bottom:16px; }
+  .banner div { margin: 2px 0; }
+  .banner.good { border-color: var(--good); } .banner.warn { border-color:#e0a030; } .banner.bad { border-color: var(--bad); }
   .switch { display:flex; align-items:center; gap:8px; margin-top:12px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>BT-7274 Voice <span id="status" class="pill">…</span></h1>
+  <h1>BT-7274 Voice <span id="status" class="pill">…</span> <span id="session" class="pill" style="display:none"></span></h1>
   <div class="sub">Hold your talk key in game and speak to BT. Keys are saved on this PC only.</div>
+
+  <div id="banner" class="banner"></div>
 
   <section>
     <h2>Talk</h2>
@@ -42,13 +47,21 @@
     </div>
     <div id="hotkeyMsg" class="sub" style="margin:8px 0 0"></div>
     <label>Hands-free (no button needed)</label>
-    <div class="switch" style="margin-top:0"><input type="checkbox" id="handsfree_enabled"><span>Listen for me. Say "BT, ..." and he answers.</span></div>
+    <div class="switch" style="margin-top:0"><input type="checkbox" id="handsfree_enabled"><span>Listen for me. Say "hey BT" to start a conversation.</span></div>
+    <div class="sub" style="margin:6px 0 0">Once you say "hey BT", BT keeps listening to everything you say until you say "thanks BT". Say "goodbye BT" to close the app.</div>
     <div class="row">
-      <div><label>Wake words (comma separated)</label><input type="text" id="wake_words"></div>
+      <div><label>Start phrases (comma separated)</label><input type="text" id="wake_phrases"></div>
+      <div><label>End phrases</label><input type="text" id="end_phrases"></div>
+    </div>
+    <div class="row">
+      <div><label>Close-the-app phrases</label><input type="text" id="quit_phrases"></div>
+      <div><label>End a quiet conversation after (seconds, 0 = never)</label><input type="number" id="session_timeout_s" min="0" max="3600"></div>
+    </div>
+    <div class="row">
       <div><label>Sensitivity: speech counts above this level (lower = more sensitive)</label><input type="number" id="vad_threshold" step="0.005" min="0.002" max="0.3"></div>
       <div><label>Pause that ends a sentence (seconds)</label><input type="number" id="vad_silence_s" step="0.1" min="0.3" max="3"></div>
     </div>
-    <div class="switch"><input type="checkbox" id="wake_word_required"><span>Only answer when I say a wake word first (strongly recommended)</span></div>
+    <div class="switch"><input type="checkbox" id="wake_word_required"><span>Wait for "hey BT" before listening (untick = BT answers everything he hears, not recommended)</span></div>
     <label>Mic level <span id="listenMsg" class="sub"></span></label>
     <div style="position:relative;height:12px;background:#0e1116;border:1px solid var(--line);border-radius:6px;overflow:hidden">
       <div id="meter" style="height:100%;width:0;background:var(--accent)"></div>
@@ -120,7 +133,7 @@
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const FIELDS = ['wake_words','vad_threshold','vad_silence_s','chapter_mode','inworld_voice_id','inworld_model_id','speaking_rate','volume','openrouter_model','whisper_model_size','persona_extra','proactive_cooldown_s'];
+const FIELDS = ['wake_phrases','end_phrases','quit_phrases','session_timeout_s','vad_threshold','vad_silence_s','chapter_mode','inworld_voice_id','inworld_model_id','speaking_rate','volume','openrouter_model','whisper_model_size','persona_extra','proactive_cooldown_s'];
 const SECRETS = ['inworld_api_key','openrouter_api_key'];
 let hotkey = '';
 
@@ -199,10 +212,41 @@ $('capture').onclick = () => {
   window.addEventListener('keydown', h, true);
 };
 
+function renderBanner(s) {
+  const m = s.mission || {};
+  const live = s.game_seconds !== null && s.game_seconds < 10;
+  let tone = 'warn';
+  const lines = [];
+  if (live) {
+    tone = m.name ? 'good' : 'warn';
+    lines.push('Connected to the game.');
+  } else if (s.game_running === true) {
+    tone = 'bad';
+    lines.push(s.game_seconds === null
+      ? 'Titanfall 2 is running, but this app has received nothing from it.'
+      : `Lost contact with the game (last message ${s.game_seconds}s ago).`);
+    lines.push('Check that the BTVoice mod is installed and the game was launched with -allowlocalhttp (docs/GAME_AWARENESS.md).');
+  } else if (s.game_running === false) {
+    lines.push('Titanfall 2 is not running.');
+  } else {
+    lines.push(s.game_seconds === null ? 'No data from the game yet.' : `Last message from the game ${s.game_seconds}s ago.`);
+  }
+  if (m.name) lines.push(`BT thinks you are on: ${m.name}` + (m.source === 'manual' ? ' (chosen by you)' : ' (from the game)'));
+  else lines.push("BT doesn't know which mission this is, so he will say so. Connect the game or pick a mission under Game awareness.");
+  const box = $('banner');
+  box.className = 'banner ' + tone;
+  box.replaceChildren(...lines.map(t => { const d = document.createElement('div'); d.textContent = t; return d; }));
+}
+
 async function poll() {
   try {
     const s = await api('/api/status');
     $('status').textContent = s.status;
+    renderBanner(s);
+    const pill = $('session');
+    pill.style.display = s.listening ? '' : 'none';
+    pill.textContent = s.session_active ? 'conversation open' : 'say "hey BT"';
+    pill.className = 'pill ' + (s.session_active ? 'ok' : '');
     $('context').textContent = s.context;
     $('gameMsg').textContent = s.game_seconds === null ? '(nothing received from the game yet)'
       : s.game_seconds < 10 ? '(connected)' : `(last message ${s.game_seconds}s ago)`;

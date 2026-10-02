@@ -3,17 +3,27 @@ plus game awareness so BT knows what is happening and can comment unprompted."""
 
 import collections
 import logging
+import random
 import threading
 import time
 from typing import Optional, Tuple
 
-from bt_voice import config, inworld, llm, lore, pipeline, speech_io, streaming
+from bt_voice import config, inworld, llm, lore, pipeline, session, speech_io, streaming
 
 log = logging.getLogger("bt")
 
 # Event types BT is allowed to react to unprompted. Anything else is just
 # recorded as context.
 NOTABLE_EVENTS = {"embark", "disembark", "map_change", "objective", "low_health", "boss", "death", "kill_streak"}
+
+# Fixed lines BT says when a conversation opens or closes. They never touch the language
+# model, and their audio is kept after the first time, so they play almost instantly.
+PHRASES = {
+    "ack": ["Standing by, Pilot.", "I am listening, Pilot."],
+    "end": ["Understood, Pilot. Standing by.", "Affirmative. I will be here if you need me."],
+    "timeout": ["Going to standby, Pilot. Say hey BT to wake me."],
+    "quit": ["Goodbye, Pilot. Closing the link.", "Understood. Shutting down. Stay alive, Pilot."],
+}
 
 # Friendly names for common weapon class names; others are tidied automatically.
 WEAPON_NAMES = {
@@ -116,12 +126,23 @@ class Engine:
         self.last_done = 0.0  # monotonic time the last request finished
         self.last_event_t = 0.0  # wall time of the last message from the game
         self._seen_sensor_errors = set()
+        self.convo = session.Conversation()
+        self.on_quit = None  # set by the server: what to do when the Pilot says goodbye
+        self._phrase_cache = {}
 
     def chapter_id(self, cfg: dict = None):
         """Chapter BT's knowledge is gated to: the manual choice, else the
         last mission detected from the game, else None (unknown)."""
         mode = (cfg or config.load())["chapter_mode"]
         return self.detected_chapter if mode == "auto" else mode
+
+    def mission_info(self, cfg: dict = None) -> dict:
+        """Which mission BT believes it is, and where that belief came from."""
+        cfg = cfg or config.load()
+        cid = self.chapter_id(cfg)
+        name = lore.CHAPTER_BY_ID[cid]["name"] if cid in lore.CHAPTER_BY_ID else None
+        source = None if not name else ("game" if cfg["chapter_mode"] == "auto" else "manual")
+        return {"id": cid, "name": name, "source": source, "map": self.context.state.get("map")}
 
     def game_connected_seconds(self) -> Optional[int]:
         """Seconds since the game last sent anything, or None if it never has."""
@@ -217,6 +238,59 @@ class Engine:
     def hear(self, question: str, stt_s: Optional[float] = None) -> None:
         """A question picked up by hands-free listening (already transcribed)."""
         self.ask_text(question, stt_s)
+
+    # --- spoken conversation control (hey BT / thanks BT / goodbye BT) ---
+    def _in_thread(self, fn, *args) -> None:
+        threading.Thread(target=self._run_guarded, args=(fn, *args), daemon=True).start()
+
+    def _say_fixed(self, cfg: dict, text: str) -> None:
+        key = (cfg["inworld_voice_id"], cfg["inworld_model_id"], cfg["speaking_rate"], text)
+        if key not in self._phrase_cache:
+            self._phrase_cache[key] = inworld.synthesize_chunk(cfg, text)
+        self.note("bt", text)
+        self.status = "speaking"
+        speech_io.play_mp3(self._phrase_cache[key], cfg["volume"])
+
+    def _say_phrase(self, kind: str) -> None:
+        self._say_fixed(config.load(), random.choice(PHRASES[kind]))
+        self.convo.touch(time.monotonic())
+
+    def prepare_phrases(self) -> None:
+        """Synthesize the fixed lines ahead of time so they play instantly."""
+        cfg = config.load()
+        if not (cfg["inworld_api_key"] and cfg["inworld_voice_id"]):
+            return
+        for lines in PHRASES.values():
+            for text in lines:
+                key = (cfg["inworld_voice_id"], cfg["inworld_model_id"], cfg["speaking_rate"], text)
+                if key not in self._phrase_cache:
+                    self._phrase_cache[key] = inworld.synthesize_chunk(cfg, text)
+
+    def _quit(self) -> None:
+        self.note("info", "Goodbye heard. Shutting the app down.")
+        try:
+            self._say_phrase("quit")
+        finally:
+            if self.on_quit:
+                self.on_quit()
+
+    def voice_action(self, kind: str, text: str, stt_s: Optional[float] = None) -> None:
+        if kind == "ask":
+            self.ask_text(text, stt_s)
+        elif kind == "start":
+            self.note("info", 'Conversation started. BT listens until you say "thanks BT".')
+            if text:
+                self.ask_text(text, stt_s)
+            else:
+                self._in_thread(self._say_phrase, "ack")
+        elif kind == "end":
+            self.note("info", "Conversation ended.")
+            self._in_thread(self._say_phrase, "end")
+        elif kind == "timeout":
+            self.note("info", "Conversation ended after a long quiet spell. Say \"hey BT\" to start again.")
+            self._in_thread(self._say_phrase, "timeout")
+        elif kind == "quit":
+            self._in_thread(self._quit)
 
     # --- push to talk ---
     def ptt_press(self) -> None:

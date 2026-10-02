@@ -11,6 +11,14 @@ CONFIG_PATH = CONFIG_DIR / "config.json"
 
 SECRET_FIELDS = ("inworld_api_key", "openrouter_api_key")
 
+# speech recognition spells "BT" many ways, so every opener is combined with every spelling
+_NAMES = ["bt", "b t", "bee tee", "beetee", "beatty", "beaty", "betty"]
+
+
+def _phrases(*openers: str) -> str:
+    return ", ".join(f"{opener} {name}" for opener in openers for name in _NAMES)
+
+
 DEFAULTS = {
     "inworld_api_key": "",
     "inworld_voice_id": "",
@@ -27,7 +35,10 @@ DEFAULTS = {
     "persona_extra": "",
     "chapter_mode": "auto",
     "handsfree_enabled": False,
-    "wake_words": "bt, b t, bee tee, beetee, beatty, beaty",
+    "wake_phrases": _phrases("hey", "hay"),
+    "end_phrases": _phrases("thanks", "thank you"),
+    "quit_phrases": _phrases("goodbye", "good bye"),
+    "session_timeout_s": 120,
     "wake_word_required": True,
     "vad_threshold": 0.02,
     "vad_silence_s": 0.8,
