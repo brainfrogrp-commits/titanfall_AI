@@ -23,10 +23,18 @@ own voice, says who wrote it, and may add one short remark. If chat is not conne
 with a fixed line instead of making something up.
 
 ## What he will not read
+- **Slurs.** A built-in filter, on by default, skips any message whose text *or username* contains one (the
+  username is read aloud too). It still catches common disguises: capitals, symbols and digits instead of letters
+  (`n!gg3r`), spaces or dots between letters, stretched letters, accents, full-width letters and look-alike letters from
+  other alphabets. It is built not to block innocent words that merely share letters, such as "snigger", "Niger" or
+  "Nigeria". The settings page shows how many messages the filters have skipped, and you can switch it off there.
+  It is a safety net, not a guarantee: it will not catch brand-new coded terms, dog whistles or other languages, so use
+  the **never read** list for anything else.
 - Messages from bots (the ignore list is editable; Nightbot, StreamElements and similar are on it).
 - Chat commands that start with "!", your own messages, and copy-paste spam.
 - Emotes, which are removed so he does not say "LUL LUL LUL". Links are spoken as "a link".
-- Anything containing a word from your **never read** list.
+- Anything containing a word from your **never read** list. It matches whole words and also sees through symbols,
+  look-alike letters and stretched letters, so `b4d` and `baaad` are caught by a `bad` entry, but `badminton` is not.
 - **Anything a moderator deletes, or from a user who is banned or timed out.** Those are removed from what he has
   kept, so he cannot read out something that was taken down.
 - Chat text is handed to the model as quoted, untrusted data with instructions not to follow it, and to skip anything

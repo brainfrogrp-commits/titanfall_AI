@@ -37,6 +37,7 @@ DEFAULTS = {
     "twitch_channel": "",
     "twitch_ignore_users": "nightbot, streamelements, moobot, fossabot, streamlabs, wizebot, soundalerts",
     "twitch_blocked_words": "",
+    "twitch_filter_slurs": True,
     "twitch_max_read": 5,
     "chapter_mode": "auto",
     "humor_level": 1,

@@ -121,6 +121,7 @@
       <div><label>Your channel name</label><input type="text" id="twitch_channel" placeholder="for example brainfrogvr"></div>
       <div><label>Most messages he will read at once</label><input type="number" id="twitch_max_read" min="1" max="10"></div>
     </div>
+    <div class="switch"><input type="checkbox" id="twitch_filter_slurs"><span>Skip any message or username containing a slur (recommended). Handles symbols, spacing and look-alike letters.</span></div>
     <label>Ignore these users (bots)</label>
     <input type="text" id="twitch_ignore_users">
     <label>Never read messages containing these words (comma separated)</label>
@@ -174,6 +175,7 @@ async function loadConfig() {
   $('proactive_enabled').checked = c.proactive_enabled;
   $('handsfree_enabled').checked = c.handsfree_enabled;
   $('twitch_enabled').checked = c.twitch_enabled;
+  $('twitch_filter_slurs').checked = c.twitch_filter_slurs;
   $('wake_word_required').checked = c.wake_word_required;
   hotkey = c.hotkey; $('hotkey').value = c.hotkey;
   $('hasInworld').textContent = c.has_inworld_api_key ? 'saved' : 'not set';
@@ -195,7 +197,7 @@ async function loadChapters() {
 
 async function save() {
   const body = {hotkey, proactive_enabled: $('proactive_enabled').checked,
-    handsfree_enabled: $('handsfree_enabled').checked, twitch_enabled: $('twitch_enabled').checked, wake_word_required: $('wake_word_required').checked};
+    handsfree_enabled: $('handsfree_enabled').checked, twitch_enabled: $('twitch_enabled').checked, twitch_filter_slurs: $('twitch_filter_slurs').checked, wake_word_required: $('wake_word_required').checked};
   FIELDS.forEach(f => body[f] = $(f).value);
   SECRETS.forEach(f => { body[f] = $(f).value.trim(); });
   await api('/api/config', body);
@@ -296,7 +298,7 @@ api('/api/version').then(v => $('version').textContent = `Build ${v.build}  |  r
 async function pollChat() {
   try {
     const c = await api('/api/chat');
-    const label = {off: 'off', connecting: 'connecting...', connected: `connected to #${c.channel} (${c.buffered} messages kept)`,
+    const label = {off: 'off', connecting: 'connecting...', connected: `connected to #${c.channel} (${c.buffered} messages kept, ${c.filtered} skipped by the filters)`,
                    error: `can't connect: ${c.error}`}[c.state] || c.state;
     $('chatMsg').textContent = label;
     $('chatMsg').className = 'sub ' + (c.state === 'connected' ? 'ok' : c.state === 'error' ? 'err' : '');

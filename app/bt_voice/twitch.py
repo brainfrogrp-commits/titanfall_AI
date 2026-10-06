@@ -15,6 +15,8 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from bt_voice import slurs
+
 HOST, PORT = "irc.chat.twitch.tv", 6697
 KEEP = 60  # messages remembered
 MAX_TEXT = 240  # longest message BT will carry
@@ -127,6 +129,8 @@ class TwitchChat:
         self.blocked: List[str] = []
         self.state = "off"  # off | connecting | connected | error
         self.error = ""
+        self.filter_slurs = True
+        self.filtered = 0  # messages kept out of BT's reach by the filters
 
     # ---- configuration
     def apply(self, cfg: dict) -> None:
@@ -134,6 +138,7 @@ class TwitchChat:
         wanted = normalize_channel(cfg["twitch_channel"]) if cfg["twitch_enabled"] else ""
         self.ignore = split_list(cfg["twitch_ignore_users"])
         self.blocked = split_list(cfg["twitch_blocked_words"])
+        self.filter_slurs = cfg["twitch_filter_slurs"]
         if wanted == self.channel and (self._thread is not None) == bool(wanted):
             return
         self.stop()
@@ -156,6 +161,7 @@ class TwitchChat:
         self._thread = None
         self.channel = ""
         self.state, self.error = "off", ""
+        self.filtered = 0
         with self._lock:
             self._messages.clear()
 
@@ -167,7 +173,8 @@ class TwitchChat:
     def status(self) -> dict:
         with self._lock:
             buffered = len(self._messages)
-        return {"state": self.state, "channel": self.channel, "error": self.error, "buffered": buffered}
+        return {"state": self.state, "channel": self.channel, "error": self.error, "buffered": buffered,
+                "filtered": self.filtered}
 
     # ---- filtering and moderation
     def _accept(self, tags: Dict[str, str], login: str, text: str) -> Optional[ChatMessage]:
@@ -178,14 +185,18 @@ class TwitchChat:
         text = clean_text(strip_emotes(text, tags.get("emotes", "")))
         if not text:
             return None
-        lowered = text.lower()
-        if any(re.search(r"\b" + re.escape(word) + r"\b", lowered) for word in self.blocked):
+        name = tags.get("display-name") or login
+        # the name is read aloud too, so it is checked as well as the text
+        if self.filter_slurs and any(slurs.contains_slur(part) for part in (text, name, login)):
+            self.filtered += 1
+            return None
+        if slurs.matches_any(text, self.blocked) or slurs.matches_any(name, self.blocked):
+            self.filtered += 1
             return None
         with self._lock:
             if self._messages and self._messages[-1].text == text:  # copy-paste spam
                 return None
-        return ChatMessage(tags.get("id", ""), tags.get("user-id", ""), login,
-                           tags.get("display-name") or login, text, time.time())
+        return ChatMessage(tags.get("id", ""), tags.get("user-id", ""), login, name, text, time.time())
 
     def handle_line(self, line: str) -> Optional[str]:
         """Process one IRC line; returns a line to send back, if any."""
