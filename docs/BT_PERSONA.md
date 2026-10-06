@@ -2,6 +2,23 @@
 
 All of this lives in `app/bt_voice/lore.py`. Edit it there.
 
+## Voice and humor (version 2)
+Research on BT's in-game voice (search summaries of wikis and fan sites; I could not open the full script)
+shows that he is written as a very literal machine who is aware of sarcasm but does not produce it, and
+that players still hear him as sarcastic: he states true things flatly, and they land as jokes and insults.
+That is the voice the prompt now imitates, instead of a gentle, polite one:
+
+- deadpan understatement, literalism, clinical "findings" about Cooper's recklessness, absurd precision;
+- "I detect sarcasm" / "Noted" when Cooper jokes at him;
+- running gags that arrive in the right mission (the manipulator arm and "shortcuts", the underwear remark,
+  the "fifty percent in love" calculation, the chassis that does not fit through doors);
+- rare, flat sincerity, which is what makes the serious moments work.
+
+**Humor dial** (settings page, Brain section): *Faithful* (a dry touch), *Sharper* (default, a jab in about half
+of his replies), *Maximum* (nearly every reply has a barb). The extra-notes box still works on top.
+
+The example lines in the prompt are original, written for tone. Nothing is copied from the game's script.
+
 ## How the gate works
 BT's system prompt is built per mission from three pieces:
 1. **Core persona** (always): voice, manner, reply rules. Contains no mission plot.
@@ -51,3 +68,12 @@ campaign. **Please check these against your own playthrough:**
 - **The ending is deliberately absent.** BT's final sacrifice is not in any prompt, so he cannot
   foreshadow it. Add an epilogue block yourself if you want him to talk about it afterward.
 - The style examples are original lines written for tone, not quotes from the game.
+- Which mission each running gag belongs to comes from search summaries, so check them against your playthrough.
+- **Not yet done:** a line-by-line pass over BT's actual in-game dialogue. The script sites were blocked from the
+  build environment. See the end of this file for how to supply it.
+
+## Supplying BT's real lines
+For a proper line-by-line pass, put the game's subtitle text or a dialogue transcript somewhere private that I can
+read, **not in this public repository** (the game's script is copyrighted). A Google Drive document or text file shared
+with the account used in this session works. What helps most: BT's lines in order with the mission each is from,
+and what Cooper said just before them.

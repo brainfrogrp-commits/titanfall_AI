@@ -7,7 +7,7 @@ import threading
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from bt_voice import config, gameproc, inworld, lifecycle, lore
+from bt_voice import config, gameproc, inworld, lifecycle, lore, twitch
 from bt_voice.bt import engine, hotkey
 from bt_voice.vad import VoiceListener
 
@@ -48,6 +48,7 @@ def set_config():
     if cfg["hotkey"] != before["hotkey"] or hotkey.key is None:
         hotkey.bind(cfg["hotkey"])
     listener.apply(cfg)
+    twitch.chat.apply(cfg)
     return jsonify(config.public_view(cfg))
 
 
@@ -107,6 +108,14 @@ def version():
     except Exception:
         build = "unknown (no git)"
     return jsonify(build=build, folder=here)
+
+
+@app.get("/api/chat")
+def chat_status():
+    return jsonify(
+        **twitch.chat.status(),
+        messages=[{"name": m.name, "text": m.text} for m in twitch.chat.recent(8)],
+    )
 
 
 @app.get("/api/chapters")
@@ -169,6 +178,7 @@ def warm_up() -> None:
 def shutdown() -> None:
     """Release the global hotkey and the mic when the app is closing."""
     hotkey.unbind()
+    twitch.chat.stop()
     if listener.running:
         try:
             listener.stop()
@@ -200,6 +210,7 @@ if __name__ == "__main__":
         raise SystemExit(1)
     hotkey.bind(config.load()["hotkey"])
     listener.apply(config.load())
+    twitch.chat.apply(config.load())
     engine.on_quit = quit_app
     lifecycle.install(shutdown)
     threading.Thread(target=warm_up, daemon=True).start()

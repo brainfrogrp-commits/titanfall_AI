@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Optional, Tuple
 
-from bt_voice import config, inworld, llm, lore, pipeline, session, speech_io, streaming
+from bt_voice import config, inworld, llm, lore, pipeline, session, speech_io, streaming, twitch
 
 log = logging.getLogger("bt")
 
@@ -23,6 +23,9 @@ PHRASES = {
     "end": ["Understood, Pilot. Standing by.", "Affirmative. I will be here if you need me."],
     "timeout": ["Going to standby, Pilot. Say hey BT to wake me."],
     "quit": ["Goodbye, Pilot. Closing the link.", "Understood. Shutting down. Stay alive, Pilot."],
+    "chat_off": ["I am not connected to your chat, Pilot."],
+    "chat_down": ["I cannot reach your chat right now, Pilot."],
+    "chat_quiet": ["Chat has been quiet, Pilot."],
 }
 
 # Friendly names for common weapon class names; others are tidied automatically.
@@ -156,7 +159,7 @@ class Engine:
     # --- core pipeline ---
     def _system(self, cfg: dict, proactive: bool = False) -> str:
         return lore.build_system_prompt(
-            self.chapter_id(cfg), self.context.describe(), cfg["persona_extra"], proactive
+            self.chapter_id(cfg), self.context.describe(), cfg["persona_extra"], proactive, cfg["humor_level"]
         )
 
     def speak(self, cfg: dict, text: str, voice_id: str = "") -> None:
@@ -205,8 +208,36 @@ class Engine:
         if bits:
             self.note("info", "Speed: " + ", ".join(bits))
 
+    def _read_chat(self, cfg: dict, question: str, count: int, stt_s: Optional[float]) -> Optional[str]:
+        """Read the latest stream chat messages aloud, in BT's voice."""
+        if not cfg["twitch_enabled"] or not cfg["twitch_channel"].strip():
+            self._say_fixed(cfg, PHRASES["chat_off"][0])
+            return None
+        if twitch.chat.status()["state"] != "connected":
+            self._say_fixed(cfg, PHRASES["chat_down"][0])
+            return None
+        messages = twitch.chat.recent(count)
+        if not messages:
+            self._say_fixed(cfg, PHRASES["chat_quiet"][0])
+            return None
+        self.status = "thinking"
+        reply, marks = self._stream_reply(
+            cfg,
+            [{"role": "system", "content": self._system(cfg)},
+             {"role": "user", "content": twitch.chat_prompt(messages)}],
+            min(450, 70 * len(messages) + 90),
+        )
+        if reply:
+            self.history.append((question, reply))
+            self.note("bt", reply)
+        self._note_timing(marks, stt_s)
+        return reply
+
     def respond(self, question: str, stt_s: Optional[float] = None) -> Optional[str]:
         cfg = config.load()
+        chat_count = twitch.parse_chat_request(question, maximum=cfg["twitch_max_read"])
+        if chat_count is not None:
+            return self._read_chat(cfg, question, chat_count, stt_s)
         messages = [{"role": "system", "content": self._system(cfg)}]
         for user_text, bt_text in self.history:
             messages += [{"role": "user", "content": user_text}, {"role": "assistant", "content": bt_text}]

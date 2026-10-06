@@ -103,8 +103,34 @@
       <div><label>Speech recognition (runs on this PC)</label>
         <select id="whisper_model_size"><option>tiny.en</option><option>base.en</option><option>small.en</option><option>tiny</option><option>base</option><option>small</option><option>medium</option></select></div>
     </div>
+    <label>BT's humor</label>
+    <select id="humor_level">
+      <option value="0">Faithful: dry and literal, a light touch</option>
+      <option value="1">Sharper: a deadpan jab in about half his replies</option>
+      <option value="2">Maximum: nearly every reply has a barb</option>
+    </select>
     <label>Extra personality notes (optional)</label>
     <textarea id="persona_extra" placeholder="e.g. Keep answers under two sentences."></textarea>
+  </section>
+
+  <section>
+    <h2>Twitch chat</h2>
+    <div class="switch" style="margin-top:0"><input type="checkbox" id="twitch_enabled"><span>Let BT read my live chat</span></div>
+    <div class="sub" style="margin:6px 0 0">Read-only and anonymous: no login or token. Ask "BT, read me the last three chat messages" or "what is chat saying?". Messages that moderators delete are removed, so he can't read them.</div>
+    <div class="row">
+      <div><label>Your channel name</label><input type="text" id="twitch_channel" placeholder="for example brainfrogvr"></div>
+      <div><label>Most messages he will read at once</label><input type="number" id="twitch_max_read" min="1" max="10"></div>
+    </div>
+    <label>Ignore these users (bots)</label>
+    <input type="text" id="twitch_ignore_users">
+    <label>Never read messages containing these words (comma separated)</label>
+    <input type="text" id="twitch_blocked_words" placeholder="optional">
+    <div class="row" style="margin-top:12px">
+      <div class="fit"><button class="ghost" id="chatTest">Read the last 3 aloud</button></div>
+      <div id="chatMsg" class="sub" style="margin:0;align-self:center"></div>
+    </div>
+    <label>Latest chat messages</label>
+    <div id="chatList" style="background:#0e1116;border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-height:44px;font-size:14px"></div>
   </section>
 
   <section>
@@ -133,7 +159,7 @@
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const FIELDS = ['wake_phrases','end_phrases','quit_phrases','session_timeout_s','vad_threshold','vad_silence_s','chapter_mode','inworld_voice_id','inworld_model_id','speaking_rate','volume','openrouter_model','whisper_model_size','persona_extra','proactive_cooldown_s'];
+const FIELDS = ['humor_level','twitch_channel','twitch_max_read','twitch_ignore_users','twitch_blocked_words','wake_phrases','end_phrases','quit_phrases','session_timeout_s','vad_threshold','vad_silence_s','chapter_mode','inworld_voice_id','inworld_model_id','speaking_rate','volume','openrouter_model','whisper_model_size','persona_extra','proactive_cooldown_s'];
 const SECRETS = ['inworld_api_key','openrouter_api_key'];
 let hotkey = '';
 
@@ -147,6 +173,7 @@ async function loadConfig() {
   FIELDS.forEach(f => $(f).value = c[f]);
   $('proactive_enabled').checked = c.proactive_enabled;
   $('handsfree_enabled').checked = c.handsfree_enabled;
+  $('twitch_enabled').checked = c.twitch_enabled;
   $('wake_word_required').checked = c.wake_word_required;
   hotkey = c.hotkey; $('hotkey').value = c.hotkey;
   $('hasInworld').textContent = c.has_inworld_api_key ? 'saved' : 'not set';
@@ -168,7 +195,7 @@ async function loadChapters() {
 
 async function save() {
   const body = {hotkey, proactive_enabled: $('proactive_enabled').checked,
-    handsfree_enabled: $('handsfree_enabled').checked, wake_word_required: $('wake_word_required').checked};
+    handsfree_enabled: $('handsfree_enabled').checked, twitch_enabled: $('twitch_enabled').checked, wake_word_required: $('wake_word_required').checked};
   FIELDS.forEach(f => body[f] = $(f).value);
   SECRETS.forEach(f => { body[f] = $(f).value.trim(); });
   await api('/api/config', body);
@@ -195,6 +222,8 @@ $('voiceSelect').onchange = e => { if (e.target.value) $('inworld_voice_id').val
 $('loadVoices').onclick = loadVoices;
 $('save').onclick = save;
 $('handsfree_enabled').onchange = save;
+$('twitch_enabled').onchange = save;
+$('chatTest').onclick = async () => { await save(); api('/api/ask', {text: 'Read me the last three chat messages.'}); };
 $('preview').onclick = async () => { await save(); api('/api/preview', {voice_id: $('inworld_voice_id').value}); };
 $('askBtn').onclick = async () => { const t = $('askText').value.trim(); if (t) { $('askText').value=''; await save(); api('/api/ask', {text: t}); } };
 $('askText').onkeydown = e => { if (e.key === 'Enter') $('askBtn').click(); };
@@ -264,6 +293,21 @@ async function poll() {
   } catch (e) { $('status').textContent = 'offline'; }
 }
 api('/api/version').then(v => $('version').textContent = `Build ${v.build}  |  running from ${v.folder}`);
+async function pollChat() {
+  try {
+    const c = await api('/api/chat');
+    const label = {off: 'off', connecting: 'connecting...', connected: `connected to #${c.channel} (${c.buffered} messages kept)`,
+                   error: `can't connect: ${c.error}`}[c.state] || c.state;
+    $('chatMsg').textContent = label;
+    $('chatMsg').className = 'sub ' + (c.state === 'connected' ? 'ok' : c.state === 'error' ? 'err' : '');
+    $('chatList').replaceChildren(...(c.messages.length ? c.messages : [{name: '', text: c.state === 'connected' ? '(nothing yet)' : ''}]).map(m => {
+      const d = document.createElement('div');
+      d.textContent = m.name ? `${m.name}: ${m.text}` : m.text;
+      return d;
+    }));
+  } catch (e) { /* the app is closed */ }
+}
+setInterval(pollChat, 2000); pollChat();
 loadChapters().then(loadConfig); poll(); setInterval(poll, 400); setInterval(loadChapters, 3000);
 </script>
 </body>

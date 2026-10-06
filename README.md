@@ -37,6 +37,9 @@ phase and is not built yet.
 The `mod/TF2VR.BTVoice` Northstar mod tells the app where you are, whether you are in the Titan,
 health, weapon, nearby enemies and more. See `docs/GAME_AWARENESS.md` (includes install steps).
 
+## Twitch chat
+BT can read the latest messages from your live chat on request. See `docs/TWITCH.md`.
+
 ## BT's personality and spoiler gating
 See `docs/BT_PERSONA.md`. BT only knows what has happened up to your current mission, and the
 settings page lets you pick the mission manually until the game mod reports it.
