@@ -16,6 +16,7 @@ PORT = 5757
 _ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 _ALLOWED_ORIGINS = {f"http://{host}" for host in _ALLOWED_HOSTS}
 
+_refused = set()
 app = Flask(__name__, static_folder="web", static_url_path="")
 listener = VoiceListener(engine)
 
@@ -24,11 +25,13 @@ listener = VoiceListener(engine)
 def only_our_own_page():
     """Any website open in your browser can fire requests at localhost. Refuse
     anything that isn't this app's own page or the game (which sends no Origin)."""
-    if request.host not in _ALLOWED_HOSTS:  # also blocks DNS-rebinding tricks
-        return jsonify(error="forbidden host"), 403
     origin = request.headers.get("Origin")
-    if origin and origin not in _ALLOWED_ORIGINS:
-        return jsonify(error="forbidden origin"), 403
+    if request.host not in _ALLOWED_HOSTS or (origin and origin not in _ALLOWED_ORIGINS):
+        key = (request.host, origin)
+        if key not in _refused:  # say so on the page, once per kind, so a wrongly blocked sender is visible
+            _refused.add(key)
+            engine.note("info", f"Refused a request from outside (host {request.host}, origin {origin or 'none'}).")
+        return jsonify(error="forbidden"), 403
 
 
 @app.get("/")

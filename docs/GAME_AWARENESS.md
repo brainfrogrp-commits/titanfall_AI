@@ -22,15 +22,32 @@ arriving at a mission, embarking, disembarking, health dropping below 30 percent
 outdoors, and an overhang reads as "under cover". Change `BTVOICE_COVER_RANGE` in the mod to tune it.
 
 ## Install the mod
-1. Close the game and the app is fine to leave running.
-2. Run `mod\install_mod.bat "C:\path\to\your\Titanfall2 folder"` (the folder that contains
-   `Titanfall2VRLauncher.exe`), or copy `mod\TF2VR.BTVoice` into `<Titanfall2>\TF2VR\mods\` yourself.
-3. The game must be launched with **`-allowlocalhttp`**, because Northstar blocks scripts from talking to
-   localhost otherwise. The install script puts it in `<Titanfall2>\ns_startup_args.txt`. If the
-   Game connection line never turns green, add `"-allowlocalhttp"` to the `arguments` list in
-   `<Titanfall2>\TF2VR\tools\launch.json` instead (a VR mod update may overwrite that file).
-4. Start the app, then the game. In the app's **Game awareness** section, "Game connection" should say
-   "(connected)" a few seconds after the level loads, and "What BT currently knows" should fill in.
+1. Close the game completely (mods are only loaded when it starts).
+2. Double-click **`mod\install_mod.bat`**. It finds your Titanfall 2 VR folder, copies the mod into
+   `<Titanfall2>\TF2VR\mods\`, turns on the **`-allowlocalhttp`** launch flag, and then runs the checker.
+   - The flag is needed because Northstar blocks game scripts from talking to localhost otherwise. It is added to
+     `<Titanfall2>\TF2VR\tools\launch.json` (that is the file the VR launcher actually reads, with a backup saved
+     as `launch.json.bak`) and to `ns_startup_args.txt`.
+   - If it cannot find the game, give it the folder that contains `Titanfall2VRLauncher.exe`:
+     `mod\install_mod.bat "C:\path\to\Titanfall2"`.
+   - If Windows refuses to write to the game folder, run it again from a PowerShell opened with
+     "Run as administrator".
+3. Start the app, then start the game from the VR launcher as usual.
+4. After a level loads, the banner at the top of the app's page should turn green ("Connected to the game").
+
+**After a VR mod update**, run `install_mod.bat` again: the update can reset `launch.json`.
+
+## When the banner says the app is receiving nothing
+Double-click **`mod\check_mod.bat`** (with the app running and the game started at least once). It checks, and tells
+you in plain words:
+- whether the mod is installed where the game looks for it, and not switched off;
+- whether the `-allowlocalhttp` flag is set;
+- what the game's own log says: whether it shows `[BTVoice] started`, and any script or compile errors;
+- whether the app itself has heard anything.
+
+Reading the result: if the log shows the mod started but the app hears nothing, the flag is the usual cause. If the log
+does not show it starting, the game did not load the mod (wrong folder, switched off, or a script error, which the
+checker prints). Send me the checker's output and I can tell which.
 
 ## Reading the banner
 The banner at the top of the settings page tells you what is going on:
@@ -41,8 +58,7 @@ The banner at the top of the settings page tells you what is going on:
   under Game awareness, or fix the connection.
 
 ## If it does not work
-- **"nothing received from the game yet"**: the launch flag is missing or not applied, or the mod did not
-  load. Look in the game's console/log for `[BTVoice] started`. Without that line the mod did not load.
+- **"nothing received from the game yet"**: run `mod\check_mod.bat`; see above.
 - **"Game sensor problem: ... sensor failed"** in the Conversation box: one sensor hit a script error
   (see the game console for the exact line). The others keep working. Send me that text.
 - Updating the VR mod through CircuitLord's installer should leave the BTVoice folder alone, because

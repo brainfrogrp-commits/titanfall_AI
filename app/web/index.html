@@ -256,7 +256,7 @@ function renderBanner(s) {
     lines.push(s.game_seconds === null
       ? 'Titanfall 2 is running, but this app has received nothing from it.'
       : `Lost contact with the game (last message ${s.game_seconds}s ago).`);
-    lines.push('Check that the BTVoice mod is installed and the game was launched with -allowlocalhttp (docs/GAME_AWARENESS.md).');
+    lines.push('Run mod\\check_mod.bat: it shows whether the mod is installed, the -allowlocalhttp flag is set, and the mod loaded (docs/GAME_AWARENESS.md).');
   } else if (s.game_running === false) {
     lines.push('Titanfall 2 is not running.');
   } else {
