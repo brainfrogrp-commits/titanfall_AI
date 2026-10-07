@@ -8,7 +8,9 @@ CircuitLord's Titanfall 2 VR mod.
 
 ## Run (Windows)
 1. Install Python 3.10+.
-2. Double-click **`START_BT_VOICE.bat`** in this folder (or run `Create_Desktop_Shortcut.bat` once to get a "BT Voice" icon on your desktop). First run installs dependencies (and downloads a
+2. Double-click **`START_BT_VOICE.bat`** in this folder. If double-clicking a `.bat` does nothing on your PC, double-click
+   **`START_BT_VOICE.vbs`** instead: it opens the same window another way. Both start the app and open its page.
+   To install the game mod, double-click `INSTALL_BT_MOD.vbs` (or `mod\install_mod.bat`); to diagnose it, `CHECK_BT_MOD.vbs`. First run installs dependencies (and downloads a
    small speech model on your first question).
 3. The settings page opens at http://127.0.0.1:5757. Enter your **Inworld** and
    **OpenRouter** keys, pick a voice, press **Set key** to choose the talk key,

@@ -276,6 +276,9 @@ def main(argv):
         print(__doc__)
         return 2
     game = find_game(argv[2] if len(argv) > 2 else None)
+    if not game and sys.stdin and sys.stdin.isatty():
+        print(f"I could not find Titanfall 2 VR by myself.\nType or paste the folder that contains {LAUNCHER} and press Enter.")
+        game = find_game(input("Folder: ").strip().strip('"'))
     if not game:
         say("PROBLEM", f"Could not find the Titanfall 2 VR folder (the one containing {LAUNCHER}). "
                        'Run this again with the path, for example: install_mod.bat "C:\\Program Files\\EA Games\\Titanfall2"')

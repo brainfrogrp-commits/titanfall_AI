@@ -125,6 +125,33 @@ class Install(unittest.TestCase):
         with mock.patch.object(setup, "_registry_paths", lambda: []):
             self.assertIsNone(setup.find_game(self.game))
 
+    def test_it_asks_for_the_folder_when_it_cannot_find_the_game(self):
+        make_game(self.game)
+        with mock.patch.object(setup, "find_game", side_effect=[None, os.path.normpath(self.game)]), \
+                mock.patch("builtins.input", return_value='"' + self.game + '"'), \
+                mock.patch.object(sys, "stdin", mock.Mock(isatty=lambda: True)):
+            code, out = run(setup.main, ["x", "check"])
+        self.assertIn("Type or paste the folder", out)
+        self.assertEqual(code, 1)  # the check itself finds problems in an empty game folder, but it did run
+        self.assertIn("Found the Titanfall 2 VR folder", out)
+
+    def test_it_does_not_hang_waiting_for_input_when_nobody_is_there(self):
+        with mock.patch.object(setup, "find_game", return_value=None), \
+                mock.patch.object(sys, "stdin", mock.Mock(isatty=lambda: False)):
+            code, out = run(setup.main, ["x", "check"])
+        self.assertEqual(code, 1)
+        self.assertIn("Could not find the Titanfall 2 VR folder", out)
+
+    def test_the_clickable_files_exist_and_point_at_real_files(self):
+        root = os.path.join(MOD_DIR, "..")
+        for vbs, target in (("START_BT_VOICE.vbs", "START_BT_VOICE.bat"), ("INSTALL_BT_MOD.vbs", os.path.join("mod", "install_mod.bat")),
+                            ("CHECK_BT_MOD.vbs", os.path.join("mod", "check_mod.bat"))):
+            with open(os.path.join(root, vbs), newline="") as f:
+                text = f.read()
+            self.assertIn("\r\n", text)
+            self.assertIn(os.path.basename(target), text)
+            self.assertTrue(os.path.exists(os.path.join(root, target)), target)
+
     def test_the_mod_sends_to_the_address_the_app_listens_on(self):
         with open(os.path.join(MOD_DIR, "TF2VR.BTVoice", "mod", "scripts", "vscripts", "bt_voice_sensors.nut")) as f:
             self.assertIn("http://127.0.0.1:5757/api/event", f.read())
