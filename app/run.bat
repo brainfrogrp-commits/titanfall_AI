@@ -21,7 +21,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-start "" http://127.0.0.1:5757
+start "" /min cmd /c "timeout /t 4 /nobreak >nul & start http://127.0.0.1:5757"
 ".venv\Scripts\python.exe" server.py
 rem a normal exit (for example after "goodbye BT") closes this window; only an error keeps it open
 if errorlevel 1 pause

@@ -23,8 +23,9 @@ outdoors, and an overhang reads as "under cover". Change `BTVOICE_COVER_RANGE` i
 
 ## Install the mod
 1. Close the game completely (mods are only loaded when it starts).
-2. Double-click **`mod\install_mod.bat`**. It finds your Titanfall 2 VR folder, copies the mod into
-   `<Titanfall2>\TF2VR\mods\`, turns on the **`-allowlocalhttp`** launch flag, and then runs the checker.
+2. Double-click **`mod\install_mod.bat`**. It finds your Titanfall 2 VR folder (or asks you for it), copies the mod into
+   `<Titanfall2>\TF2VR\mods\`, turns on the **`-allowlocalhttp`** launch flag, and then starts the BT Voice app for you.
+   It is a plain batch file and needs nothing else installed.
    - The flag is needed because Northstar blocks game scripts from talking to localhost otherwise. It is added to
      `<Titanfall2>\TF2VR\tools\launch.json` (that is the file the VR launcher actually reads, with a backup saved
      as `launch.json.bak`) and to `ns_startup_args.txt`.
@@ -38,7 +39,7 @@ outdoors, and an overhang reads as "under cover". Change `BTVOICE_COVER_RANGE` i
 **After a VR mod update**, run `install_mod.bat` again: the update can reset `launch.json`.
 
 ## When the banner says the app is receiving nothing
-Double-click **`mod\check_mod.bat`** (with the app running and the game started at least once). It checks, and tells
+Double-click **`mod\check_mod.bat`** (also a plain batch file; with the app running and the game started at least once). It checks, and tells
 you in plain words:
 - whether the mod is installed where the game looks for it, and not switched off;
 - whether the `-allowlocalhttp` flag is set;
