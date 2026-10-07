@@ -37,6 +37,18 @@ phase and is not built yet.
 The `mod/TF2VR.BTVoice` Northstar mod tells the app where you are, whether you are in the Titan,
 health, weapon, nearby enemies and more. See `docs/GAME_AWARENESS.md` (includes install steps).
 
+## If double-clicking a .bat file does nothing
+Open PowerShell in this folder and run the files by name instead:
+
+    cd C:\Users\skate\Desktop\VResources\titanfall_AI
+    .\START_BT_VOICE.bat
+    .\mod\install_mod.bat
+    .\mod\check_mod.bat
+
+To find out why double-clicking fails, run `cmd /c assoc .bat` (should print `.bat=batfile`) and
+`cmd /c ftype batfile` (should print `batfile="%1" %*`). If the files came from a download, `Get-ChildItem -Recurse *.bat | Unblock-File`
+removes Windows' "downloaded from the internet" block.
+
 ## Twitch chat
 BT can read the latest messages from your live chat on request. See `docs/TWITCH.md`.
 
